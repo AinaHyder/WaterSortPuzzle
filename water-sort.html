@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Sort Puzzle - Data Structures Project</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f8ff;
+            padding: 20px;
+        }
+        
+        .game-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        
+        .game-title {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        
+        .tube {
+            width: 60px;
+            height: 200px;
+            margin: 10px;
+            display: inline-block;
+            position: relative;
+            border-radius: 5px 5px 0 0;
+            background-color: rgba(255, 255, 255, 0.3);
+            border: 3px solid #2c3e50;
+            border-bottom: none;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .tube:hover {
+            transform: translateY(-5px);
+        }
+        
+        .tube.selected {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .tube::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: -3px;
+            width: 60px;
+            height: 10px;
+            background-color: #2c3e50;
+            border-radius: 0 0 5px 5px;
+        }
+        
+        .water {
+            position: absolute;
+            width: 100%;
+            border-radius: 0 0 5px 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .controls {
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        .level-indicator {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .win-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(46, 204, 113, 0.9);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+        
+        .data-structure-info {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .color-palette {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .color-sample {
+            width: 30px;
+            height: 30px;
+            margin: 5px;
+            border-radius: 50%;
+            border: 2px solid #2c3e50;
+        }
+        
+        @keyframes pour {
+            0% { transform: translateY(0) scaleY(1); }
+            50% { transform: translateY(-20px) scaleY(0.5); }
+            100% { transform: translateY(0) scaleY(1); }
+        }
+        
+        .pouring {
+            animation: pour 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="game-title">Water Sort Puzzle</h1>
+        
+        <div class="color-palette" id="colorPalette"></div>
+        
+        <div class="level-indicator">
+            Level: <span id="currentLevel">1</span> /
+            <span id="totalLevels">5</span>
+        </div>
+        
+        <div class="text-center" id="gameBoard"></div>
+        
+        <div class="controls">
+            <button class="btn btn-primary me-2" id="newGameBtn">New Game</button>
+            <button class="btn btn-warning me-2" id="restartBtn">Restart Level</button>
+            <button class="btn btn-success me-2" id="nextLevelBtn" disabled>Next Level</button>
+            <button class="btn btn-info" id="hintBtn">Hint</button>
+        </div>
+        
+        <div class="data-structure-info">
+            <h5>Data Structures Used:</h5>
+            <ul>
+                <li><strong>Stack</strong> - Used to represent each tube (LIFO for water layers)</li>
+                <li><strong>Queue</strong> - Used for BFS in hint generation</li>
+                <li><strong>Linked List</strong> - Used to manage game state history</li>
+                <li><strong>Sorting Algorithms</strong> - For checking level completion</li>
+                <li><strong>Search Algorithms</strong> - For pathfinding in hint generation</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="win-message" id="winMessage">
+        <h2>Level Complete!</h2>
+        <p>Congratulations, you solved the puzzle!</p>
+        <button class="btn btn-light mt-3" id="continueBtn">Continue</button>
+    </div>
+
+    <script>
+        // Stack implementation (LIFO)
+        class Stack {
+            constructor(elements = []) {
+                this.items = [...elements];
+            }
+            
+            push(element) {
+                this.items.push(element);
+            }
+            
+            pop() {
+                if (this.isEmpty()) return null;
+                return this.items.pop();
+            }
+            
+            peek() {
+                if (this.isEmpty()) return null;
+                return this.items[this.items.length - 1];
+            }
+            
+            isEmpty() {
+                return this.items.length === 0;
+            }
+            
+            isFull() {
+                return this.items.length >= 4;
+            }
+            
+            size() {
+                return this.items.length;
+            }
+            
+            elements() {
+                return [...this.items];
+            }
+        }
+
+        // Queue implementation (FIFO)
+        class Queue {
+            constructor() {
+                this.items = [];
+            }
+            
+            enqueue(element) {
+                this.items.push(element);
+            }
+            
+            dequeue() {
+                if (this.isEmpty()) return null;
+                return this.items.shift();
+            }
+            
+            isEmpty() {
+                return this.items.length === 0;
+            }
+        }
+
+        // Linked List implementation (for state history)
+        class LinkedList {
+            constructor() {
+                this.head = null;
+                this.tail = null;
+                this.length = 0;
+            }
+            
+            append(value) {
+                const newNode = { value, next: null };
+                
+                if (!this.head) {
+                    this.head = newNode;
+                    this.tail = newNode;
+                } else {
+                    this.tail.next = newNode;
+                    this.tail = newNode;
+                }
+                
+                this.length++;
+            }
+        
+            removeLast() {
+                if (!this.head) return null;
+                
+                let current = this.head;
+                let newTail = current;
+                
+                while (current.next) {
+                    newTail = current;
+                    current = current.next;
+                }
+                
+                this.tail = newTail;
+                this.tail.next = null;
+                this.length--;
+                
+                if (this.length === 0) {
+                    this.head = null;
+                    this.tail = null;
+                }
+                
+                return current.value;
+            }
+            
+            getLast() {
+                if (!this.tail) return null;
+                return this.tail.value;
+            }
+        }
+
+        // Game constants
+        const COLORS = [
+            '#FF5252', '#FF4081', '#E040FB', '#7C4DFF', '#536DFE', 
+            '#448AFF', '#40C4FF', '#18FFFF', '#64FFDA', '#69F0AE', 
+            '#B2FF59', '#EEFF41', '#FFFF00', '#FFD740', '#FFAB40', 
+            '#FF6E40', '#FF3D00', '#8D6E63', '#9E9E9E', '#607D8B'
+        ];
+        
+        const LEVELS = [
+            { tubes: 4, colors: 2, empty: 2 },   // Level 1
+            { tubes: 5, colors: 3, empty: 2 },   // Level 2
+            { tubes: 6, colors: 4, empty: 2 },   // Level 3
+            { tubes: 7, colors: 5, empty: 2 },   // Level 4
+            { tubes: 8, colors: 6, empty: 2 }    // Level 5
+        ];
+        
+        // Game state
+        let currentLevel = 0;
+        let selectedTube = null;
+        let gameState = [];
+        let stateHistory = new LinkedList();
+        
+        // DOM elements
+        const gameBoard = document.getElementById('gameBoard');
+        const currentLevelDisplay = document.getElementById('currentLevel');
+        const totalLevelsDisplay = document.getElementById('totalLevels');
+        const newGameBtn = document.getElementById('newGameBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const nextLevelBtn = document.getElementById('nextLevelBtn');
+        const hintBtn = document.getElementById('hintBtn');
+        const winMessage = document.getElementById('winMessage');
+        const continueBtn = document.getElementById('continueBtn');
+        const colorPalette = document.getElementById('colorPalette');
+        
+        // Initialize the game
+        function initGame() {
+            totalLevelsDisplay.textContent = LEVELS.length;
+            setupColorPalette();
+            loadLevel(currentLevel);
+            
+            // Event listeners
+            newGameBtn.addEventListener('click', () => {
+                currentLevel = 0;
+                loadLevel(currentLevel);
+            });
+            
+            restartBtn.addEventListener('click', () => {
+                loadLevel(currentLevel);
+            });
+            
+            nextLevelBtn.addEventListener('click', () => {
+                currentLevel++;
+                if (currentLevel >= LEVELS.length) {
+                    currentLevel = 0;
+                }
+                loadLevel(currentLevel);
+            });
+            
+            hintBtn.addEventListener('click', showHint);
+            continueBtn.addEventListener('click', () => {
+                winMessage.style.display = 'none';
+                nextLevelBtn.click();
+            });
+        }
+        
+        // Set up the color palette display
+        function setupColorPalette() {
+            colorPalette.innerHTML = '';
+            COLORS.forEach(color => {
+                const colorSample = document.createElement('div');
+                colorSample.className = 'color-sample';
+                colorSample.style.backgroundColor = color;
+                colorPalette.appendChild(colorSample);
+            });
+        }
+        
+        // Load a specific level
+        function loadLevel(levelIndex) {
+            currentLevelDisplay.textContent = levelIndex + 1;
+            nextLevelBtn.disabled = true;
+            
+            const level = LEVELS[levelIndex];
+            gameState = createLevel(level.tubes, level.colors, level.empty);
+            stateHistory = new LinkedList();
+            stateHistory.append(cloneGameState(gameState));
+            
+            renderGame();
+        }
+        
+        // Create a random level configuration
+        function createLevel(totalTubes, colorCount, emptyTubes) {
+            // Create array of colors to use
+            const colors = COLORS.slice(0, colorCount);
+            const colorCopies = [];
+            
+            // Each color appears 4 times (to fill exactly one tube)
+            for (let i = 0; i < colors.length; i++) {
+                for (let j = 0; j < 4; j++) {
+                    colorCopies.push(colors[i]);
+                }
+            }
+            
+            // Shuffle the colors
+            shuffleArray(colorCopies);
+            
+            // Distribute colors to tubes
+            const tubes = [];
+            const colorsPerTube = 4;
+            const filledTubes = totalTubes - emptyTubes;
+            
+            for (let i = 0; i < filledTubes; i++) {
+                const tube = new Stack();
+                for (let j = 0; j < colorsPerTube; j++) {
+                    tube.push(colorCopies.pop());
+                }
+                tubes.push(tube);
+            }
+            
+            // Add empty tubes
+            for (let i = 0; i < emptyTubes; i++) {
+                tubes.push(new Stack());
+            }
+            
+            return tubes;
+        }
+        
+        // Render the game board
+        function renderGame() {
+            gameBoard.innerHTML = '';
+            
+            gameState.forEach((tube, index) => {
+                const tubeElement = document.createElement('div');
+                tubeElement.className = 'tube';
+                tubeElement.dataset.index = index;
+                
+                // Add water layers
+                const elements = tube.elements();
+                const waterHeight = 200 / 4; // 4 is max layers per tube
+                
+                for (let i = 0; i < elements.length; i++) {
+                    const water = document.createElement('div');
+                    water.className = 'water';
+                    water.style.backgroundColor = elements[i];
+                    water.style.height = `${waterHeight}px`;
+                    water.style.bottom = `${i * waterHeight}px`;
+                    tubeElement.appendChild(water);
+                }
+                
+                tubeElement.addEventListener('click', () => handleTubeClick(index));
+                gameBoard.appendChild(tubeElement);
+            });
+        }
+        
+        // Handle tube clicks
+        function handleTubeClick(tubeIndex) {
+            // If no tube is selected, select this one
+            if (selectedTube === null) {
+                // Don't select empty tubes or tubes with uniform color
+                if (!gameState[tubeIndex].isEmpty() && !isTubeComplete(gameState[tubeIndex])) {
+                    selectedTube = tubeIndex;
+                    highlightTube(tubeIndex, true);
+                }
+            } 
+            // If this tube is already selected, deselect it
+            else if (selectedTube === tubeIndex) {
+                selectedTube = null;
+                highlightTube(tubeIndex, false);
+            } 
+            // Otherwise, try to pour from selected tube to this one
+            else {
+                if (pourWater(selectedTube, tubeIndex)) {
+                    // Successful pour - save state
+                    stateHistory.append(cloneGameState(gameState));
+                    
+                    // Check for win condition
+                    if (checkWinCondition()) {
+                        showWinMessage();
+                    }
+                }
+                
+                // Deselect the tube
+                highlightTube(selectedTube, false);
+                selectedTube = null;
+            }
+        }
+        
+        // Highlight a tube
+        function highlightTube(tubeIndex, highlight) {
+            const tubes = document.querySelectorAll('.tube');
+            if (highlight) {
+                tubes[tubeIndex].classList.add('selected');
+            } else {
+                tubes[tubeIndex].classList.remove('selected');
+            }
+        }
+        
+        // Pour water from one tube to another
+        function pourWater(fromIndex, toIndex) {
+            const fromTube = gameState[fromIndex];
+            const toTube = gameState[toIndex];
+            
+            // Check if pour is valid
+            if (fromTube.isEmpty()) return false;
+            if (toTube.isFull()) return false;
+            
+            // Get the top color(s) from the source tube
+            const topColor = fromTube.peek();
+            let consecutiveColors = 1;
+            
+            // Count how many consecutive same colors are on top
+            const elements = fromTube.elements();
+            for (let i = elements.length - 2; i >= 0; i--) {
+                if (elements[i] === topColor && consecutiveColors < (4 - toTube.size())) {
+                    consecutiveColors++;
+                } else {
+                    break;
+                }
+            }
+            
+            // Check if destination tube can accept this color
+            if (!toTube.isEmpty() && toTube.peek() !== topColor) {
+                return false;
+            }
+            
+            // Perform the pour
+            for (let i = 0; i < consecutiveColors; i++) {
+                toTube.push(fromTube.pop());
+            }
+            
+            // Animate the pour
+            animatePour(fromIndex, toIndex, consecutiveColors, topColor);
+            
+            return true;
+        }
+        
+        // Animate the pouring of water
+        function animatePour(fromIndex, toIndex, amount, color) {
+            const tubes = document.querySelectorAll('.tube');
+            const fromTube = tubes[fromIndex];
+            const toTube = tubes[toIndex];
+            
+            // Create a temporary element for the pouring animation
+            const pouringWater = document.createElement('div');
+            pouringWater.className = 'water pouring';
+            pouringWater.style.backgroundColor = color;
+            pouringWater.style.height = `${(200 / 4) * amount}px`;
+            pouringWater.style.position = 'absolute';
+            pouringWater.style.zIndex = '100';
+            
+            // Position it at the source tube
+            const fromRect = fromTube.getBoundingClientRect();
+            pouringWater.style.left = `${fromRect.left}px`;
+            pouringWater.style.top = `${fromRect.top + (200 - (200 / 4) * amount)}px`;
+            pouringWater.style.width = `${fromRect.width}px`;
+            
+            document.body.appendChild(pouringWater);
+            
+            // Animate to the destination tube
+            setTimeout(() => {
+                const toRect = toTube.getBoundingClientRect();
+                const currentElements = gameState[toIndex].elements().length - amount;
+                const targetTop = toRect.top + (200 - (200 / 4) * (currentElements + amount));
+                
+                pouringWater.style.transition = 'all 0.5s ease-in-out';
+                pouringWater.style.left = `${toRect.left}px`;
+                pouringWater.style.top = `${targetTop}px`;
+                
+                // Remove after animation completes and re-render
+                setTimeout(() => {
+                    pouringWater.remove();
+                    renderGame();
+                }, 500);
+            }, 100);
+        }
+        
+        // Check if a tube is complete (all same color and full)
+        function isTubeComplete(tube) {
+            if (tube.isEmpty() || !tube.isFull()) return false;
+            
+            const elements = tube.elements();
+            const firstColor = elements[0];
+            
+            for (let i = 1; i < elements.length; i++) {
+                if (elements[i] !== firstColor) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        // Check if all tubes are complete (win condition)
+        function checkWinCondition() {
+            // Count completed tubes
+            let completed = 0;
+            let empty = 0;
+            
+            for (let i = 0; i < gameState.length; i++) {
+                if (isTubeComplete(gameState[i])) {
+                    completed++;
+                } else if (gameState[i].isEmpty()) {
+                    empty++;
+                }
+            }
+            
+            // Win if all non-empty tubes are complete
+            return completed === (gameState.length - empty);
+        }
+        
+        // Show win message
+        function showWinMessage() {
+            winMessage.style.display = 'block';
+            nextLevelBtn.disabled = false;
+        }
+        
+        // Show hint
+        function showHint() {
+            // Use BFS to find a valid move
+            const hint = findValidMove(gameState);
+            
+            if (hint) {
+                // Highlight the tubes involved in the hint
+                const tubes = document.querySelectorAll('.tube');
+                
+                // Flash the from tube
+                highlightTube(hint.from, true);
+                setTimeout(() => {
+                    highlightTube(hint.from, false);
+                    
+                    // After a delay, flash the to tube
+                    setTimeout(() => {
+                        highlightTube(hint.to, true);
+                        setTimeout(() => {
+                            highlightTube(hint.to, false);
+                        }, 500);
+                    }, 500);
+                }, 500);
+            } else {
+                alert('No valid moves found! Try restarting the level.');
+            }
+        }
+        
+        // Find a valid move using BFS
+        function findValidMove(state) {
+            // Create a queue for BFS
+            const queue = new Queue();
+            
+            // Track visited states to avoid cycles
+            const visited = new Set();
+            visited.add(hashGameState(state));
+            
+            // Initial state
+            queue.enqueue({
+                state: cloneGameState(state),
+                moves: []
+            });
+            
+            while (!queue.isEmpty()) {
+                const current = queue.dequeue();
+                
+                // Check all possible moves from current state
+                for (let from = 0; from < current.state.length; from++) {
+                    for (let to = 0; to < current.state.length; to++) {
+                        if (from === to) continue;
+                        
+                        // Try the move
+                        const newState = cloneGameState(current.state);
+                        if (canPour(newState, from, to)) {
+                            // Perform the pour
+                            performPour(newState, from, to);
+                            
+                            // Check if we've seen this state before
+                            const stateHash = hashGameState(newState);
+                            if (!visited.has(stateHash)) {
+                                visited.add(stateHash);
+                                
+                                // If this move solves a tube, return it immediately
+                                if (isTubeComplete(newState[from]) || isTubeComplete(newState[to])) {
+                                    return { from, to };
+                                }
+                                
+                                // Otherwise enqueue the new state
+                                queue.enqueue({
+                                    state: newState,
+                                    moves: [...current.moves, { from, to }]
+                                });
+                                
+                                // If this is the first move found, return it after checking others
+                                if (current.moves.length === 0) {
+                                    return { from, to };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        }
+        
+        // Check if a pour is possible between two tubes
+        function canPour(state, fromIndex, toIndex) {
+            const fromTube = state[fromIndex];
+            const toTube = state[toIndex];
+            
+            if (fromTube.isEmpty()) return false;
+            if (toTube.isFull()) return false;
+            
+            const topColor = fromTube.peek();
+            if (!toTube.isEmpty() && toTube.peek() !== topColor) return false;
+            
+            return true;
+        }
+        
+        // Perform a pour between two tubes
+        function performPour(state, fromIndex, toIndex) {
+            const fromTube = state[fromIndex];
+            const toTube = state[toIndex];
+            
+            const topColor = fromTube.peek();
+            let consecutiveColors = 1;
+            
+            // Count how many consecutive same colors are on top
+            const elements = fromTube.elements();
+            for (let i = elements.length - 2; i >= 0; i--) {
+                if (elements[i] === topColor && consecutiveColors < (4 - toTube.size())) {
+                    consecutiveColors++;
+                } else {
+                    break;
+                }
+            }
+            
+            // Perform the pour
+            for (let i = 0; i < consecutiveColors; i++) {
+                toTube.push(fromTube.pop());
+            }
+        }
+        
+        // Hash the game state for tracking visited states
+        function hashGameState(state) {
+            return state.map(tube => tube.elements().join(',')).join('|');
+        }
+        
+        // Clone the game state
+        function cloneGameState(state) {
+            return state.map(tube => new Stack(tube.elements()));
+        }
+        
+        // Utility function to shuffle an array
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+        
+        // Initialize the game when the page loads
+        window.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
